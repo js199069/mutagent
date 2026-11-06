@@ -1,0 +1,19 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+// هم داخل خود پکیج، هم وقتی در vendor یک پروژه‌ی دیگر نصب شده
+foreach ([__DIR__ . '/../vendor/autoload.php', __DIR__ . '/../../../autoload.php'] as $autoload) {
+    if (is_file($autoload)) {
+        require $autoload;
+        break;
+    }
+}
+
+use Js199069\Mutagent\Console\ReportCommand;
+use Symfony\Component\Console\Application;
+
+$app = new Application('mutagent', '0.1.0-dev');
+$app->addCommands([new ReportCommand()]);
+$app->run();

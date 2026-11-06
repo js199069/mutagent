@@ -1,0 +1,25 @@
+{
+    "name": "js199069/mutagent",
+    "description": "AI-written PHPUnit tests that are kept only if they kill mutants.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "nikic/php-parser": "^5.0",
+        "symfony/console": "^7.4|^8.0",
+        "symfony/http-client": "^7.4|^8.0",
+        "symfony/process": "^7.4|^8.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5|^12.0"
+    },
+    "autoload": {
+        "psr-4": { "Js199069\\Mutagent\\": "src/" }
+    },
+    "autoload-dev": {
+        "psr-4": { "Js199069\\Mutagent\\Tests\\": "tests/" }
+    },
+    "bin": ["bin/mutagent"],
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

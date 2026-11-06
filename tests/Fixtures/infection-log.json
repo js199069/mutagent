@@ -1,0 +1,40 @@
+{
+    "stats": {
+        "totalMutantsCount": 3,
+        "killedCount": 1,
+        "escapedCount": 2,
+        "notCoveredCount": 0,
+        "errorCount": 0,
+        "timeOutCount": 0,
+        "msi": 33.33,
+        "mutationCodeCoverage": 100
+    },
+    "escaped": [
+        {
+            "mutator": {
+                "mutatorName": "LessThanOrEqualTo",
+                "originalFilePath": "src/ShippingCalculator.php",
+                "originalStartLine": 9
+            },
+            "diff": "@@ @@\r\n     {\r\n-        if ($weightKg <= 0) {\r\n+        if ($weightKg < 0) {\r\n"
+        },
+        {
+            "mutator": {
+                "mutatorName": "Plus",
+                "originalFilePath": "src/ShippingCalculator.php",
+                "originalStartLine": 20
+            },
+            "diff": "@@ @@\n #Warning: Strings contain different line endings!\n-        $cost = $base + $extraKg * 10000;\n+        $cost = $base - $extraKg * 10000;\n"
+        }
+    ],
+    "killed": [
+        {
+            "mutator": {
+                "mutatorName": "Minus",
+                "originalFilePath": "src/ShippingCalculator.php",
+                "originalStartLine": 19
+            },
+            "diff": "@@ @@\n-        $extraKg = $a - 1;\n+        $extraKg = $a + 1;\n"
+        }
+    ]
+}
