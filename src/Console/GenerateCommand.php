@@ -7,6 +7,7 @@ namespace Js199069\Mutagent\Console;
 use Js199069\Mutagent\Analysis\ClassAnalyzer;
 use Js199069\Mutagent\Generation\PromptBuilder;
 use Js199069\Mutagent\Generation\TestGenerator;
+use Js199069\Mutagent\Llm\CachingChatClient;
 use Js199069\Mutagent\Llm\OpenAiCompatibleClient;
 use Js199069\Mutagent\Runner\PhpUnitRunner;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -27,6 +28,7 @@ final class GenerateCommand extends Command
             ->addOption('project', null, InputOption::VALUE_REQUIRED, 'Project root (where vendor/bin/phpunit is)', getcwd())
             ->addOption('out', null, InputOption::VALUE_REQUIRED, 'Output directory, relative to the project', 'tests/Generated')
             ->addOption('attempts', null, InputOption::VALUE_REQUIRED, 'Maximum generate/fix attempts', '3')
+            ->addOption('no-cache', null, InputOption::VALUE_NONE, 'Do not reuse cached LLM responses')
             ->addOption('model', null, InputOption::VALUE_REQUIRED, 'Model name (overrides MUTAGENT_LLM_MODEL)');
     }
 
@@ -46,7 +48,8 @@ final class GenerateCommand extends Command
         $prompts = new PromptBuilder(phpunitVersion: $version);
         $testFile = $project . DIRECTORY_SEPARATOR . $input->getOption('out') . DIRECTORY_SEPARATOR . $prompts->testClassName($class) . '.php';
 
-        $llm = OpenAiCompatibleClient::fromEnv($input->getOption('model'));
+        $base = OpenAiCompatibleClient::fromEnv($input->getOption('model'));
+        $llm = $input->getOption('no-cache') ? $base : new CachingChatClient($base, $project . '/.mutagent/llm-cache', $base->cacheNamespace());
         $generator = new TestGenerator($llm, $runner, $prompts);
 
         $start = microtime(true);
@@ -57,7 +60,11 @@ final class GenerateCommand extends Command
             fn (int $n, bool $passed) => $io->writeln("  attempt {$n}: " . ($passed ? '<info>passed</info>' : '<comment>failed</comment>')),
         );
         $seconds = round(microtime(true) - $start, 1);
-        $io->writeln($llm->usage()->summary());
+        $io->writeln($base->usage()->summary() . ($llm instanceof CachingChatClient ? ", cache hits: {$llm->hits}" : ''));
+
+        if ($result->removedFailing !== []) {
+            $io->warning('Removed ' . count($result->removedFailing) . ' test(s) that still contradicted the code: ' . implode(', ', $result->removedFailing));
+        }
 
         if ($result->passed) {
             $io->success("Tests pass after {$result->attempts} attempt(s), {$seconds}s: {$result->testFile}");

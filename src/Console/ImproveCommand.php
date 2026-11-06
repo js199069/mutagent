@@ -9,8 +9,10 @@ use Js199069\Mutagent\Generation\PromptBuilder;
 use Js199069\Mutagent\Improvement\ImprovePromptBuilder;
 use Js199069\Mutagent\Improvement\TestImprover;
 use Js199069\Mutagent\Improvement\TestMinimizer;
+use Js199069\Mutagent\Improvement\VerdictStore;
 use Js199069\Mutagent\Infection\InfectionRunner;
 use Js199069\Mutagent\Infection\MutationReport;
+use Js199069\Mutagent\Llm\CachingChatClient;
 use Js199069\Mutagent\Llm\OpenAiCompatibleClient;
 use Js199069\Mutagent\Runner\PhpUnitRunner;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -30,8 +32,9 @@ final class ImproveCommand extends Command
             ->addArgument('class-file', InputArgument::REQUIRED, 'Path to the class, relative to the project')
             ->addOption('project', null, InputOption::VALUE_REQUIRED, 'Project root', getcwd())
             ->addOption('test', null, InputOption::VALUE_REQUIRED, 'Test file (default: tests/Generated/<Class>GeneratedTest.php)')
-            ->addOption('rounds', null, InputOption::VALUE_REQUIRED, 'Maximum improvement rounds (0 = only minimize)', '3')
-            ->addOption('no-minimize', null, InputOption::VALUE_NONE, 'Keep tests that kill no mutant')
+            ->addOption('rounds', null, InputOption::VALUE_REQUIRED, 'Maximum improvement rounds (0 = only measure)', '3')
+            ->addOption('minimize', null, InputOption::VALUE_NONE, 'Remove tests that kill no mutant (verified with Infection)')
+            ->addOption('no-cache', null, InputOption::VALUE_NONE, 'Do not reuse cached LLM responses')
             ->addOption('model', null, InputOption::VALUE_REQUIRED, 'Model name (overrides MUTAGENT_LLM_MODEL)');
     }
 
@@ -56,14 +59,18 @@ final class ImproveCommand extends Command
 
         $io->writeln("Class: <info>{$class->fqcn}</info> — test: {$testFile}");
 
-        $llm = OpenAiCompatibleClient::fromEnv($input->getOption('model'));
+        $base = OpenAiCompatibleClient::fromEnv($input->getOption('model'));
+        $llm = $input->getOption('no-cache') ? $base : new CachingChatClient($base, $project . '/.mutagent/llm-cache', $base->cacheNamespace());
         $mutation = new InfectionRunner($project, $classFile);
+        $store = new VerdictStore($project . '/.mutagent/verdicts-' . substr(sha1(str_replace('\\', '/', $classFile)), 0, 10) . '.json');
+
         $improver = new TestImprover(
             llm: $llm,
             runner: $runner,
             mutation: $mutation,
             prompts: new ImprovePromptBuilder($version),
             fixPrompts: new PromptBuilder(phpunitVersion: $version),
+            store: $store,
         );
 
         $start = microtime(true);
@@ -77,13 +84,18 @@ final class ImproveCommand extends Command
             )),
         );
 
-        $minimizeNote = 'skipped';
-        if (! $input->getOption('no-minimize') && $result->final->killed > 0) {
+        $minimizer = new TestMinimizer($runner, $mutation);
+        if ($input->getOption('minimize')) {
             $io->writeln('  minimizing...');
-            $minimized = (new TestMinimizer($runner, $mutation))->minimize($testFile, $result->final);
-            $minimizeNote = $minimized->removed !== []
+            $minimized = $minimizer->minimize($testFile, $result->final);
+            $redundantNote = $minimized->removed !== []
                 ? 'removed ' . count($minimized->removed) . ': ' . implode(', ', $minimized->removed)
                 : (string) $minimized->note;
+        } else {
+            [$redundant, $note] = $minimizer->redundant($testFile, $result->final);
+            $redundantNote = $redundant !== []
+                ? count($redundant) . ' kill no mutant (kept; --minimize removes them): ' . implode(', ', $redundant)
+                : (string) $note;
         }
 
         $seconds = round(microtime(true) - $start, 1);
@@ -94,9 +106,9 @@ final class ImproveCommand extends Command
             ['MSI excluding claimed-equivalent' => $result->msiExcludingClaimedEquivalent() . '%'],
             ['Rounds' => (string) $result->rounds],
             ['Rejected candidates' => (string) $result->rejectedCandidates],
-            ['Minimization' => $minimizeNote],
+            ['Redundant tests' => $redundantNote],
             ['Time' => $seconds . 's'],
-            ['LLM usage' => $llm->usage()->summary()],
+            ['LLM usage' => $base->usage()->summary() . ($llm instanceof CachingChatClient ? ", cache hits: {$llm->hits}" : '')],
         );
 
         if ($result->equivalent !== []) {

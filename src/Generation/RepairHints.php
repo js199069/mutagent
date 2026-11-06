@@ -30,7 +30,22 @@ final class RepairHints
             $hints[] = "Class \"{$m[1]}\" was not found. Check the use statements and the namespace of the class under test.";
         }
 
-        if (str_contains($phpunitOutput, 'is identical to') || str_contains($phpunitOutput, 'Failed asserting that')) {
+        // assertSame نوع را هم مقایسه می‌کند: '-1000' (رشته) با -1000 (عدد) یکی نیست
+        if (preg_match("/Failed asserting that '(-?[\d.]+)' is identical to (-?[\d.]+)\./", $phpunitOutput, $m)) {
+            $hints[] = "The actual value is the string '{$m[1]}', but the test expects the number {$m[2]}. "
+                . "assertSame compares types: the code returns a string here, so expect the string literal '{$m[1]}'.";
+        } elseif (preg_match("/Failed asserting that (-?[\d.]+) is identical to '(-?[\d.]+)'\./", $phpunitOutput, $m)) {
+            $hints[] = "The actual value is the number {$m[1]}, but the test expects the string '{$m[2]}'. "
+                . "assertSame compares types: the code returns a number here, so expect {$m[1]} without quotes.";
+        }
+
+        if (preg_match('/Failed asserting that exception of type "([^"]+)" is thrown/', $phpunitOutput, $m)) {
+            $hints[] = "The code does not throw {$m[1]} for that input. Trace the source: the input is probably valid "
+                . '(assert the returned value instead), or a different input is needed to trigger the exception.';
+        }
+
+        // راهنمای عمومی فقط وقتی هیچ راهنمای دقیق‌تری پیدا نشده؛ وگرنه مدل را گمراه می‌کند
+        if ($hints === [] && (str_contains($phpunitOutput, 'is identical to') || str_contains($phpunitOutput, 'Failed asserting that'))) {
             $hints[] = 'An expected value is wrong. Recompute it by tracing the source code step by step, including rounding and integer casts. '
                 . 'Do not change the expectation to match a guess.';
         }

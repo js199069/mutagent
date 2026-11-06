@@ -54,10 +54,13 @@ final class ImprovePromptBuilder
         Surviving mutants:
         {$mutants}
 
-        Reply with exactly two blocks:
+        Reply with:
         1. A ```json block: [{"mutant": 1, "verdict": "kill", "reason": "..."}, ...] covering every mutant.
-        2. The complete updated test file in a single ```php block. Keep all existing tests.
-           Use PHP attributes, never docblock annotations. If every mutant is equivalent, return the file unchanged.
+        2. Only if at least one verdict is "kill": a single ```php block with ONLY the new or changed test methods
+           (and any data provider methods they need), preceded by `use` lines for any new imports.
+           Do not repeat the class declaration or unchanged tests. A method with the same name as an existing one replaces it.
+           Use PHP attributes, never docblock annotations.
+        If every mutant is equivalent, send only the JSON block.
         TXT;
 
         return [

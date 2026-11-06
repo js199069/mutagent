@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Js199069\Mutagent\Improvement;
 
 use Js199069\Mutagent\Analysis\ClassInfo;
-use Js199069\Mutagent\Generation\CodeExtractor;
+use Js199069\Mutagent\Editing\TestFileMerger;
 use Js199069\Mutagent\Generation\PromptBuilder;
 use Js199069\Mutagent\Infection\MutantKey;
 use Js199069\Mutagent\Infection\MutationRunner;
@@ -15,8 +15,10 @@ use RuntimeException;
 
 /**
  * حلقه‌ی mutation: mutantهای زنده ← مدل (kill یا equivalent) ← تست تازه، که باید روی کد اصلی سبز باشد ← Infection دوباره.
+ * مدل فقط متدهای تازه را می‌فرستد و ادغام می‌شوند (صرفه‌جویی در توکن خروجی).
  * هر mutant حداکثر maxAttemptsPerMutant بار هدف قرار می‌گیرد.
- * نامزدی که قرمز است، یا Infection نمی‌پذیردش (مثلاً وابسته به ترتیب اجرا)، کنار گذاشته و فایل قبلی برگردانده می‌شود.
+ * نامزدی که قرمز است، یا Infection نمی‌پذیردش، کنار گذاشته و فایل قبلی برگردانده می‌شود.
+ * تصمیم‌های «هم‌ارز» در VerdictStore می‌مانند تا اجرای بعدی دوباره برایشان توکن خرج نکند.
  */
 final class TestImprover
 {
@@ -27,9 +29,10 @@ final class TestImprover
         private ImprovePromptBuilder $prompts = new ImprovePromptBuilder(),
         private PromptBuilder $fixPrompts = new PromptBuilder(),
         private VerdictParser $parser = new VerdictParser(),
-        private CodeExtractor $extractor = new CodeExtractor(),
         private int $maxAttemptsPerMutant = 2,
         private int $repairAttempts = 2,
+        private ?VerdictStore $store = null,
+        private TestFileMerger $merger = new TestFileMerger(),
     ) {}
 
     public function improve(ClassInfo $class, string $testFile, int $rounds = 3, ?callable $onRound = null): ImprovementResult
@@ -39,7 +42,7 @@ final class TestImprover
         $initial = $report;
         $onRound && $onRound(0, $report);
 
-        $equivalent = [];
+        $equivalent = $this->store?->load() ?? [];
         $attempts = [];
         $roundsRun = 0;
         $rejected = 0;
@@ -66,12 +69,12 @@ final class TestImprover
                     $toKill++;
                 }
             }
+            $this->store?->save($equivalent);
 
             if ($toKill > 0) {
-                $candidate = $this->candidate($response, $messages, $testFile);
+                $candidate = $this->candidate($response, $messages, $testFile, $current);
 
                 if ($candidate === null) {
-                    // نامزد روی کد اصلی سبز نشد؛ گزارش قبلی همچنان معتبر است
                     file_put_contents($testFile, $current);
                     $rejected++;
                 } else {
@@ -79,7 +82,6 @@ final class TestImprover
                         $report = $this->mutation->run($testFile);
                         $current = $candidate;
                     } catch (RuntimeException) {
-                        // سبز بود، ولی Infection نپذیرفت (مثلاً وابستگی به ترتیب اجرا): فایل سالم قبلی برمی‌گردد
                         file_put_contents($testFile, $current);
                         $rejected++;
                     }
@@ -89,26 +91,32 @@ final class TestImprover
             $onRound && $onRound($round, $report);
         }
 
-        $unresolved = array_values(array_filter(
-            $report->escapedMutants(),
-            fn ($m) => ! isset($equivalent[MutantKey::of($m)]),
-        ));
+        // فقط هم‌ارزهایی که در گزارش نهایی واقعاً زنده‌اند (تصمیم‌های ذخیره‌شده‌ی قدیمی در مخرج حساب نشوند)
+        $escapedKeys = array_map(MutantKey::of(...), $report->escapedMutants());
+        $relevantEquivalent = array_values(array_filter($equivalent, fn ($v) => in_array($v->key, $escapedKeys, true)));
+        $unresolved = array_values(array_filter($report->escapedMutants(), fn ($m) => ! isset($equivalent[MutantKey::of($m)])));
 
-        return new ImprovementResult($initial, $report, array_values($equivalent), $unresolved, $roundsRun, $rejected);
+        return new ImprovementResult($initial, $report, $relevantEquivalent, $unresolved, $roundsRun, $rejected);
     }
 
-    /** فایل تازه را می‌نویسد و تا سبز شدن روی کد اصلی تعمیر می‌کند؛ اگر نشد null */
-    private function candidate(string $response, array $messages, string $testFile): ?string
+    /**
+     * جواب مدل را روی فایل فعلی اعمال می‌کند و تا سبز شدن روی کد اصلی تعمیر می‌کند؛ اگر نشد null.
+     * پایه‌ی هر تعمیر، آخرین نامزد نوشته‌شده است، تا متدهای اصلاح‌شده جایگزین همان‌ها شوند.
+     */
+    private function candidate(string $response, array $messages, string $testFile, string $current): ?string
     {
+        $base = $current;
+
         for ($i = 0; $i <= $this->repairAttempts; $i++) {
             try {
-                $code = $this->extractor->extract($response);
+                $code = $this->merger->apply($base, $response);
                 file_put_contents($testFile, $code);
                 $result = $this->runner->run($testFile);
                 if ($result->passed) {
                     return $code;
                 }
                 $output = $result->output;
+                $base = $code;
             } catch (RuntimeException $e) {
                 $output = $e->getMessage();
             }

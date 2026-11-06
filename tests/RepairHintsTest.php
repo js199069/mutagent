@@ -40,4 +40,12 @@ final class RepairHintsTest extends TestCase
         $this->assertStringContainsString('Likely cause', $message['content']);
         $this->assertStringContainsString('DataProvider', $message['content']);
     }
+
+    public function test_string_versus_number_mismatch_is_explained(): void
+    {
+        // خروجی واقعی روی DecimalMoneyParser
+        $hints = (new RepairHints())->for("Failed asserting that '-1000' is identical to -1000.");
+
+        $this->assertStringContainsString("expect the string literal '-1000'", $hints[0]);
+    }
 }

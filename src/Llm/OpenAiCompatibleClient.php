@@ -50,6 +50,12 @@ final class OpenAiCompatibleClient implements ChatClient
         return $this->usage;
     }
 
+    /** کلید جدا کردن کش مدل‌ها و سرویس‌های مختلف */
+    public function cacheNamespace(): string
+    {
+        return $this->baseUrl . '|' . $this->model . '|' . $this->temperature;
+    }
+
     public function complete(array $messages): string
     {
         $attempt = 0;
