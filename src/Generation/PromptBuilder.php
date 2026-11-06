@@ -64,7 +64,7 @@ final class PromptBuilder
     /** @return array{role: string, content: string} */
     public function fix(string $phpunitOutput): array
     {
-        $output = mb_substr($phpunitOutput, 0, 4000);
+        $output = mb_substr(self::stable($phpunitOutput), 0, 4000);
         $hints = $this->hints->for($phpunitOutput);
         $hintText = $hints === [] ? '' : "\nLikely cause:\n- " . implode("\n- ", $hints) . "\n";
 
@@ -80,5 +80,17 @@ final class PromptBuilder
             Return the complete corrected PHP file, in a single ```php code block.
             TXT,
         ];
+    }
+
+    /**
+     * خط‌هایی از خروجی PHPUnit که هر بار عوض می‌شوند (seed تصادفی، زمان، حافظه، مسیر پیکربندی) حذف می‌شوند:
+     * هم برای مدل بی‌فایده‌اند، هم نمی‌گذارند پیام تعمیر از کش بیاید.
+     */
+    public static function stable(string $phpunitOutput): string
+    {
+        $text = str_replace("\r\n", "\n", $phpunitOutput);
+        $text = (string) preg_replace('/^(PHPUnit \d.*by Sebastian Bergmann.*|Runtime:.*|Configuration:.*|Random Seed:.*|Time: .*Memory:.*)\n?/m', '', $text);
+
+        return trim((string) preg_replace("/\n{3,}/", "\n\n", $text));
     }
 }

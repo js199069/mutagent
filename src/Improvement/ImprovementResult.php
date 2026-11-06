@@ -12,6 +12,7 @@ final readonly class ImprovementResult
     /**
      * @param list<MutantVerdict> $equivalent
      * @param list<Mutant> $unresolved
+     * @param list<string> $removedAtStart تست‌هایی که Infection را در شروع متوقف می‌کردند و حذف شدند
      */
     public function __construct(
         public MutationReport $initial,
@@ -20,6 +21,7 @@ final readonly class ImprovementResult
         public array $unresolved,
         public int $rounds,
         public int $rejectedCandidates = 0,
+        public array $removedAtStart = [],
     ) {}
 
     /** MSI وقتی mutantهایی که مدل هم‌ارز دانسته از مخرج کنار گذاشته شوند (ادعا، نه اثبات) */

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Js199069\Mutagent\Improvement;
 
 use Js199069\Mutagent\Analysis\ClassInfo;
+use Js199069\Mutagent\Editing\Salvager;
 use Js199069\Mutagent\Editing\TestFileMerger;
 use Js199069\Mutagent\Generation\PromptBuilder;
 use Js199069\Mutagent\Infection\MutantKey;
@@ -16,8 +17,8 @@ use RuntimeException;
 /**
  * حلقه‌ی mutation: mutantهای زنده ← مدل (kill یا equivalent) ← تست تازه، که باید روی کد اصلی سبز باشد ← Infection دوباره.
  * مدل فقط متدهای تازه را می‌فرستد و ادغام می‌شوند (صرفه‌جویی در توکن خروجی).
- * هر mutant حداکثر maxAttemptsPerMutant بار هدف قرار می‌گیرد.
- * نامزدی که قرمز است، یا Infection نمی‌پذیردش، کنار گذاشته و فایل قبلی برگردانده می‌شود.
+ * اگر Infection در شروع به‌خاطر چند تست قرمز اجرا نشود، همان‌ها حذف می‌شوند (نجات) و دوباره امتحان می‌شود.
+ * هر mutant حداکثر maxAttemptsPerMutant بار هدف قرار می‌گیرد؛ نامزد قرمز یا ردشده برگردانده می‌شود.
  * تصمیم‌های «هم‌ارز» در VerdictStore می‌مانند تا اجرای بعدی دوباره برایشان توکن خرج نکند.
  */
 final class TestImprover
@@ -37,8 +38,18 @@ final class TestImprover
 
     public function improve(ClassInfo $class, string $testFile, int $rounds = 3, ?callable $onRound = null): ImprovementResult
     {
+        $removedAtStart = [];
+        try {
+            $report = $this->mutation->run($testFile);
+        } catch (RuntimeException $e) {
+            $removedAtStart = (new Salvager($this->runner))->salvage($testFile, $e->getMessage());
+            if ($removedAtStart === []) {
+                throw $e;
+            }
+            $report = $this->mutation->run($testFile);
+        }
+
         $current = (string) file_get_contents($testFile);
-        $report = $this->mutation->run($testFile);
         $initial = $report;
         $onRound && $onRound(0, $report);
 
@@ -96,7 +107,7 @@ final class TestImprover
         $relevantEquivalent = array_values(array_filter($equivalent, fn ($v) => in_array($v->key, $escapedKeys, true)));
         $unresolved = array_values(array_filter($report->escapedMutants(), fn ($m) => ! isset($equivalent[MutantKey::of($m)])));
 
-        return new ImprovementResult($initial, $report, $relevantEquivalent, $unresolved, $roundsRun, $rejected);
+        return new ImprovementResult($initial, $report, $relevantEquivalent, $unresolved, $roundsRun, $rejected, $removedAtStart);
     }
 
     /**

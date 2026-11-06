@@ -28,7 +28,7 @@ final class TestFileMerger
         }
 
         if (preg_match('/^\s*(final\s+|abstract\s+|readonly\s+)*class\s+\w+/m', $block)) {
-            return $this->extractor->extract($response);
+            return TestMethodEditor::lf($this->extractor->extract($response));
         }
 
         return $this->merge($current, $block);
@@ -36,11 +36,12 @@ final class TestFileMerger
 
     public function merge(string $current, string $snippet): string
     {
-        $snippet = trim((string) preg_replace('/^<\?php\s*/', '', trim($snippet)));
+        $current = TestMethodEditor::lf($current);
+        $snippet = trim((string) preg_replace('/^<\?php\s*/', '', trim(TestMethodEditor::lf($snippet))));
 
         preg_match_all('/^[ \t]*use\s+[^;(]+;[ \t]*$/m', $snippet, $m);
         $uses = array_map('trim', $m[0]);
-        $methods = trim((string) preg_replace('/^[ \t]*use\s+[^;(]+;[ \t]*\R?/m', '', $snippet));
+        $methods = trim((string) preg_replace('/^[ \t]*use\s+[^;(]+;[ \t]*\n?/m', '', $snippet));
         if ($methods === '') {
             throw new RuntimeException('LLM snippet contains no methods');
         }
@@ -48,10 +49,9 @@ final class TestFileMerger
         $code = $this->removeMethods($current, $this->methodNames($methods));
 
         foreach ($uses as $use) {
-            if (str_contains($code, $use)) {
-                continue;
+            if (! str_contains($code, $use)) {
+                $code = $this->addUse($code, $use);
             }
-            $code = $this->addUse($code, $use);
         }
 
         $close = strrpos($code, '}');
@@ -87,26 +87,12 @@ final class TestFileMerger
         $ast = (new ParserFactory())->createForHostVersion()->parse($code) ?? [];
         $ranges = [];
         foreach ((new NodeFinder())->findInstanceOf($ast, ClassMethod::class) as $method) {
-            if (! in_array($method->name->toString(), $names, true)) {
-                continue;
+            if (in_array($method->name->toString(), $names, true)) {
+                $ranges[] = [TestMethodEditor::startLine($method), $method->getEndLine()];
             }
-            $start = $method->getStartLine();
-            foreach ($method->attrGroups as $group) {
-                $start = min($start, $group->getStartLine());
-            }
-            if ($doc = $method->getDocComment()) {
-                $start = min($start, $doc->getStartLine());
-            }
-            $ranges[] = [$start, $method->getEndLine()];
         }
 
-        usort($ranges, fn ($a, $b) => $b[0] <=> $a[0]);
-        $lines = preg_split('/\R/', $code);
-        foreach ($ranges as [$start, $end]) {
-            array_splice($lines, $start - 1, $end - $start + 1);
-        }
-
-        return (string) preg_replace("/\n{3,}/", "\n\n", implode("\n", $lines));
+        return TestMethodEditor::removeRanges($code, $ranges);
     }
 
     private function addUse(string $code, string $use): string
@@ -129,7 +115,7 @@ final class TestFileMerger
 
     private function indent(string $methods): string
     {
-        $lines = preg_split('/\R/', $methods);
+        $lines = explode("\n", $methods);
         $first = current(array_filter($lines, fn ($l) => trim($l) !== '')) ?: '';
         if (str_starts_with($first, '    ') || str_starts_with($first, "\t")) {
             return implode("\n", $lines);

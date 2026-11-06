@@ -105,6 +105,7 @@ final class ImproveCommand extends Command
             ['MSI after' => $result->final->msi . '%'],
             ['MSI excluding claimed-equivalent' => $result->msiExcludingClaimedEquivalent() . '%'],
             ['Rounds' => (string) $result->rounds],
+            ['Removed at start' => $result->removedAtStart === [] ? '-' : implode(', ', $result->removedAtStart)],
             ['Rejected candidates' => (string) $result->rejectedCandidates],
             ['Redundant tests' => $redundantNote],
             ['Time' => $seconds . 's'],

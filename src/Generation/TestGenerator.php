@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Js199069\Mutagent\Generation;
 
 use Js199069\Mutagent\Analysis\ClassInfo;
-use Js199069\Mutagent\Editing\TestMethodEditor;
+use Js199069\Mutagent\Editing\Salvager;
 use Js199069\Mutagent\Llm\ChatClient;
 use Js199069\Mutagent\Runner\TestRunner;
 use RuntimeException;
@@ -22,8 +22,6 @@ final class TestGenerator
         private TestRunner $runner,
         private PromptBuilder $prompts = new PromptBuilder(),
         private CodeExtractor $extractor = new CodeExtractor(),
-        private TestMethodEditor $editor = new TestMethodEditor(),
-        private float $maxSalvageShare = 0.3,
     ) {}
 
     public function generate(ClassInfo $class, string $testFile, int $maxAttempts = 3, ?callable $onAttempt = null): GenerationResult
@@ -47,7 +45,7 @@ final class TestGenerator
                 continue;
             }
 
-            file_put_contents($testFile, $code);
+            file_put_contents($testFile, str_replace("\r\n", "\n", $code));
             $wroteCode = true;
             $result = $this->runner->run($testFile);
             $lastOutput = $result->output;
@@ -62,38 +60,13 @@ final class TestGenerator
         }
 
         if ($wroteCode && is_file($testFile)) {
-            $salvaged = $this->salvage($testFile, $lastOutput);
-            if ($salvaged !== null) {
-                return new GenerationResult(true, $maxAttempts, $testFile, $salvaged['output'], $salvaged['removed']);
+            $removed = (new Salvager($this->runner))->salvage($testFile, $lastOutput);
+            if ($removed !== []) {
+                return new GenerationResult(true, $maxAttempts, $testFile, $lastOutput, $removed);
             }
             rename($testFile, $testFile . '.failed');
         }
 
         return new GenerationResult(false, $maxAttempts, $testFile . '.failed', $lastOutput);
-    }
-
-    /** @return array{removed: list<string>, output: string}|null */
-    private function salvage(string $testFile, string $phpunitOutput): ?array
-    {
-        $failing = TestMethodEditor::failingTests($phpunitOutput);
-        $code = (string) file_get_contents($testFile);
-        $methods = $this->editor->testMethods($code);
-
-        $failing = array_values(array_intersect($failing, array_keys($methods)));
-        $limit = max(1, (int) floor($this->maxSalvageShare * count($methods)));
-        if ($failing === [] || count($failing) > $limit || count($failing) >= count($methods)) {
-            return null;
-        }
-
-        file_put_contents($testFile, $this->editor->remove($code, $failing));
-        $result = $this->runner->run($testFile);
-
-        if (! $result->passed) {
-            file_put_contents($testFile, $code);
-
-            return null;
-        }
-
-        return ['removed' => $failing, 'output' => $result->output];
     }
 }
