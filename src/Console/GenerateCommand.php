@@ -42,14 +42,12 @@ final class GenerateCommand extends Command
         $runner = new PhpUnitRunner($project);
         $version = $runner->version();
         $io->writeln('PHPUnit: <info>' . ($version ?? 'unknown') . '</info>');
+
         $prompts = new PromptBuilder(phpunitVersion: $version);
         $testFile = $project . DIRECTORY_SEPARATOR . $input->getOption('out') . DIRECTORY_SEPARATOR . $prompts->testClassName($class) . '.php';
 
-        $generator = new TestGenerator(
-            OpenAiCompatibleClient::fromEnv($input->getOption('model')),
-            $runner,
-            $prompts,
-        );
+        $llm = OpenAiCompatibleClient::fromEnv($input->getOption('model'));
+        $generator = new TestGenerator($llm, $runner, $prompts);
 
         $start = microtime(true);
         $result = $generator->generate(
@@ -59,6 +57,7 @@ final class GenerateCommand extends Command
             fn (int $n, bool $passed) => $io->writeln("  attempt {$n}: " . ($passed ? '<info>passed</info>' : '<comment>failed</comment>')),
         );
         $seconds = round(microtime(true) - $start, 1);
+        $io->writeln($llm->usage()->summary());
 
         if ($result->passed) {
             $io->success("Tests pass after {$result->attempts} attempt(s), {$seconds}s: {$result->testFile}");

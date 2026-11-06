@@ -8,6 +8,7 @@ use Js199069\Mutagent\Analysis\ClassAnalyzer;
 use Js199069\Mutagent\Generation\PromptBuilder;
 use Js199069\Mutagent\Improvement\ImprovePromptBuilder;
 use Js199069\Mutagent\Improvement\TestImprover;
+use Js199069\Mutagent\Improvement\TestMinimizer;
 use Js199069\Mutagent\Infection\InfectionRunner;
 use Js199069\Mutagent\Infection\MutationReport;
 use Js199069\Mutagent\Llm\OpenAiCompatibleClient;
@@ -29,7 +30,8 @@ final class ImproveCommand extends Command
             ->addArgument('class-file', InputArgument::REQUIRED, 'Path to the class, relative to the project')
             ->addOption('project', null, InputOption::VALUE_REQUIRED, 'Project root', getcwd())
             ->addOption('test', null, InputOption::VALUE_REQUIRED, 'Test file (default: tests/Generated/<Class>GeneratedTest.php)')
-            ->addOption('rounds', null, InputOption::VALUE_REQUIRED, 'Maximum improvement rounds', '3')
+            ->addOption('rounds', null, InputOption::VALUE_REQUIRED, 'Maximum improvement rounds (0 = only minimize)', '3')
+            ->addOption('no-minimize', null, InputOption::VALUE_NONE, 'Keep tests that kill no mutant')
             ->addOption('model', null, InputOption::VALUE_REQUIRED, 'Model name (overrides MUTAGENT_LLM_MODEL)');
     }
 
@@ -54,10 +56,12 @@ final class ImproveCommand extends Command
 
         $io->writeln("Class: <info>{$class->fqcn}</info> — test: {$testFile}");
 
+        $llm = OpenAiCompatibleClient::fromEnv($input->getOption('model'));
+        $mutation = new InfectionRunner($project, $classFile);
         $improver = new TestImprover(
-            llm: OpenAiCompatibleClient::fromEnv($input->getOption('model')),
+            llm: $llm,
             runner: $runner,
-            mutation: new InfectionRunner($project, $classFile),
+            mutation: $mutation,
             prompts: new ImprovePromptBuilder($version),
             fixPrompts: new PromptBuilder(phpunitVersion: $version),
         );
@@ -72,6 +76,16 @@ final class ImproveCommand extends Command
                 $round, $r->msi, $r->killed, $r->escaped, $r->notCovered, $r->total,
             )),
         );
+
+        $minimizeNote = 'skipped';
+        if (! $input->getOption('no-minimize') && $result->final->killed > 0) {
+            $io->writeln('  minimizing...');
+            $minimized = (new TestMinimizer($runner, $mutation))->minimize($testFile, $result->final);
+            $minimizeNote = $minimized->removed !== []
+                ? 'removed ' . count($minimized->removed) . ': ' . implode(', ', $minimized->removed)
+                : (string) $minimized->note;
+        }
+
         $seconds = round(microtime(true) - $start, 1);
 
         $io->definitionList(
@@ -80,7 +94,9 @@ final class ImproveCommand extends Command
             ['MSI excluding claimed-equivalent' => $result->msiExcludingClaimedEquivalent() . '%'],
             ['Rounds' => (string) $result->rounds],
             ['Rejected candidates' => (string) $result->rejectedCandidates],
+            ['Minimization' => $minimizeNote],
             ['Time' => $seconds . 's'],
+            ['LLM usage' => $llm->usage()->summary()],
         );
 
         if ($result->equivalent !== []) {

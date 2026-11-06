@@ -38,6 +38,7 @@ final class InfectionLogReader
                     line: (int) ($mutator['originalStartLine'] ?? 0),
                     // پایان خط ویندوز در diff، خروجی را شلوغ می‌کند
                     diff: str_replace("\r\n", "\n", (string) ($item['diff'] ?? '')),
+                    failedTests: $this->failedTests((string) ($item['processOutput'] ?? '')),
                 );
             }
         }
@@ -53,5 +54,13 @@ final class InfectionLogReader
             mutationCodeCoverage: (float) ($stats['mutationCodeCoverage'] ?? 0),
             mutants: $mutants,
         );
+    }
+
+    /** «1) Tests\Generated\FooTest::testBar with data set #2» ← testBar */
+    private function failedTests(string $processOutput): array
+    {
+        preg_match_all('/^\d+\) \S+::(\w+)/m', str_replace("\r\n", "\n", $processOutput), $m);
+
+        return array_values(array_unique($m[1]));
     }
 }

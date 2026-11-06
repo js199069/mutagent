@@ -6,6 +6,7 @@ namespace Js199069\Mutagent\Llm;
 
 use RuntimeException;
 use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Contracts\HttpClient\Exception\ClientExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\ServerExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -14,6 +15,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 final class OpenAiCompatibleClient implements ChatClient
 {
     private HttpClientInterface $http;
+
+    private Usage $usage;
 
     public function __construct(
         private string $baseUrl,
@@ -25,6 +28,7 @@ final class OpenAiCompatibleClient implements ChatClient
         ?HttpClientInterface $http = null,
     ) {
         $this->http = $http ?? HttpClient::create();
+        $this->usage = new Usage();
     }
 
     public static function fromEnv(?string $model = null): self
@@ -41,6 +45,11 @@ final class OpenAiCompatibleClient implements ChatClient
         );
     }
 
+    public function usage(): Usage
+    {
+        return $this->usage;
+    }
+
     public function complete(array $messages): string
     {
         $attempt = 0;
@@ -53,9 +62,14 @@ final class OpenAiCompatibleClient implements ChatClient
                     'timeout' => $this->timeout,
                 ]);
                 $data = $response->toArray();
+                $this->usage->add($data['usage'] ?? []);
 
                 return (string) ($data['choices'][0]['message']['content']
                     ?? throw new RuntimeException('LLM response has no message content'));
+            } catch (ClientExceptionInterface $e) {
+                // خطای ۴xx (کلید، اعتبار، محدودیت): تکرار فایده ندارد؛ متن سرور را نشان بده
+                $body = mb_substr($e->getResponse()->getContent(false), 0, 500);
+                throw new RuntimeException(sprintf('LLM request rejected (%d): %s', $e->getResponse()->getStatusCode(), $body), previous: $e);
             } catch (TransportExceptionInterface|ServerExceptionInterface $e) {
                 // خطای موقت (قطع اتصال، ۵۰۲/۵۰۳): دوباره، با فاصله‌ی ۳ و ۶ ثانیه
                 if (++$attempt > $this->retries) {
