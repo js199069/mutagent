@@ -6,7 +6,10 @@ namespace Js199069\Mutagent\Runner;
 
 use Symfony\Component\Process\Process;
 
-/** اجرای یک فایل تست با PHPUnit خود پروژه‌ی هدف. */
+/**
+ * اجرای یک فایل تست با PHPUnit خود پروژه‌ی هدف.
+ * با ترتیب تصادفی، چون Infection هم همین کار را می‌کند؛ تست وابسته به ترتیب باید همین‌جا رد شود.
+ */
 final class PhpUnitRunner implements TestRunner
 {
     public function __construct(
@@ -18,7 +21,7 @@ final class PhpUnitRunner implements TestRunner
     public function run(string $testFile): RunResult
     {
         $process = new Process(
-            [$this->phpBinary, 'vendor/bin/phpunit', '--colors=never', $testFile],
+            [$this->phpBinary, 'vendor/bin/phpunit', '--colors=never', '--order-by=random', $testFile],
             $this->projectDir,
             timeout: $this->timeout,
         );

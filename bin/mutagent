@@ -12,9 +12,10 @@ foreach ([__DIR__ . '/../vendor/autoload.php', __DIR__ . '/../../../autoload.php
 }
 
 use Js199069\Mutagent\Console\GenerateCommand;
+use Js199069\Mutagent\Console\ImproveCommand;
 use Js199069\Mutagent\Console\ReportCommand;
 use Symfony\Component\Console\Application;
 
 $app = new Application('mutagent', '0.1.0-dev');
-$app->addCommands([new ReportCommand(), new GenerateCommand()]);
+$app->addCommands([new ReportCommand(), new GenerateCommand(), new ImproveCommand()]);
 $app->run();
