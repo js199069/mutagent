@@ -42,7 +42,9 @@ final class TestImprover
         try {
             $report = $this->mutation->run($testFile);
         } catch (RuntimeException $e) {
-            $removedAtStart = (new Salvager($this->runner))->salvage($testFile, $e->getMessage());
+            // Infection با اولین شکست متوقف می‌شود؛ فهرست کامل تست‌های قرمز را از یک اجرای کامل PHPUnit بگیر
+            $full = $this->runner->run($testFile);
+            $removedAtStart = $full->passed ? [] : (new Salvager($this->runner))->salvage($testFile, $full->output);
             if ($removedAtStart === []) {
                 throw $e;
             }
@@ -102,7 +104,6 @@ final class TestImprover
             $onRound && $onRound($round, $report);
         }
 
-        // فقط هم‌ارزهایی که در گزارش نهایی واقعاً زنده‌اند (تصمیم‌های ذخیره‌شده‌ی قدیمی در مخرج حساب نشوند)
         $escapedKeys = array_map(MutantKey::of(...), $report->escapedMutants());
         $relevantEquivalent = array_values(array_filter($equivalent, fn ($v) => in_array($v->key, $escapedKeys, true)));
         $unresolved = array_values(array_filter($report->escapedMutants(), fn ($m) => ! isset($equivalent[MutantKey::of($m)])));
@@ -110,10 +111,6 @@ final class TestImprover
         return new ImprovementResult($initial, $report, $relevantEquivalent, $unresolved, $roundsRun, $rejected, $removedAtStart);
     }
 
-    /**
-     * جواب مدل را روی فایل فعلی اعمال می‌کند و تا سبز شدن روی کد اصلی تعمیر می‌کند؛ اگر نشد null.
-     * پایه‌ی هر تعمیر، آخرین نامزد نوشته‌شده است، تا متدهای اصلاح‌شده جایگزین همان‌ها شوند.
-     */
     private function candidate(string $response, array $messages, string $testFile, string $current): ?string
     {
         $base = $current;

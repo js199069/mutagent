@@ -1,8 +1,17 @@
 {
     "name": "js199069/mutagent",
-    "description": "AI-written PHPUnit tests that are kept only if they kill mutants.",
+    "description": "LLM-written PHPUnit tests, strengthened until they kill mutants (Infection), with honest equivalent-mutant reporting.",
     "type": "library",
     "license": "MIT",
+    "keywords": ["phpunit", "mutation-testing", "infection", "llm", "test-generation", "ai", "laravel"],
+    "homepage": "https://github.com/js199069/mutagent",
+    "authors": [
+        { "name": "js199069", "homepage": "https://github.com/js199069" }
+    ],
+    "support": {
+        "issues": "https://github.com/js199069/mutagent/issues",
+        "source": "https://github.com/js199069/mutagent"
+    },
     "require": {
         "php": "^8.3",
         "nikic/php-parser": "^5.0",
@@ -13,6 +22,9 @@
     "require-dev": {
         "phpunit/phpunit": "^11.5|^12.0"
     },
+    "suggest": {
+        "infection/infection": "Required in the project under test for the 'improve' command"
+    },
     "autoload": {
         "psr-4": { "Js199069\\Mutagent\\": "src/" }
     },
@@ -20,6 +32,7 @@
         "psr-4": { "Js199069\\Mutagent\\Tests\\": "tests/" }
     },
     "bin": ["bin/mutagent"],
+    "config": { "sort-packages": true },
     "minimum-stability": "stable",
     "prefer-stable": true
 }

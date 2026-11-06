@@ -1,0 +1,385 @@
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Generated;
+
+use Money\Currencies\ISOCurrencies;
+use Money\Currency;
+use Money\Money;
+use Money\Formatter\DecimalMoneyFormatter;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
+
+final class DecimalMoneyFormatterGeneratedTest extends TestCase
+{
+    private DecimalMoneyFormatter $formatter;
+
+    protected function setUp(): void
+    {
+        $currencies = new ISOCurrencies();
+        $this->formatter = new DecimalMoneyFormatter($currencies);
+    }
+
+    #[Test]
+    public function format_zero_usd_returns_zero_with_two_decimal_places(): void
+    {
+        // USD has 2 subunits.
+        // Value: 0, length: 1, subunit: 2.
+        // valueLength (1) <= subunit (2).
+        // formatted = '0.' . str_pad('', 2 - 1, '0') . '0'
+        //           = '0.' . '0' . '0' = '0.00'
+        $money = new Money(0, new Currency('USD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('0.00', $result);
+    }
+
+    #[Test]
+    public function format_one_cent_usd_returns_point_zero_one(): void
+    {
+        // USD has 2 subunits.
+        // Value: 1, length: 1, subunit: 2.
+        // valueLength (1) <= subunit (2).
+        // formatted = '0.' . str_pad('', 2 - 1, '0') . '1'
+        //           = '0.' . '0' . '1' = '0.01'
+        $money = new Money(1, new Currency('USD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('0.01', $result);
+    }
+
+    #[Test]
+    public function format_ten_cents_usd_returns_point_one_zero(): void
+    {
+        // USD has 2 subunits.
+        // Value: 10, length: 2, subunit: 2.
+        // valueLength (2) <= subunit (2).
+        // formatted = '0.' . str_pad('', 2 - 2, '0') . '10'
+        //           = '0.' . '' . '10' = '0.10'
+        $money = new Money(10, new Currency('USD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('0.10', $result);
+    }
+
+    #[Test]
+    public function format_one_hundred_cents_usd_returns_one_zero_zero(): void
+    {
+        // USD has 2 subunits.
+        // Value: 100, length: 3, subunit: 2.
+        // valueLength (3) > subunit (2).
+        // formatted = substr('100', 0, 3-2) = '1'
+        // decimalDigits = substr('100', 3-2) = '00'
+        // formatted = '1' . '.' . '00' = '1.00'
+        $money = new Money(100, new Currency('USD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('1.00', $result);
+    }
+
+    #[Test]
+    public function format_one_dollar_and_fifty_cents_usd_returns_one_point_five_zero(): void
+    {
+        // USD has 2 subunits.
+        // Value: 150, length: 3, subunit: 2.
+        // valueLength (3) > subunit (2).
+        // formatted = substr('150', 0, 1) = '1'
+        // decimalDigits = substr('150', 1) = '50'
+        // formatted = '1' . '.' . '50' = '1.50'
+        $money = new Money(150, new Currency('USD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('1.50', $result);
+    }
+
+    #[Test]
+    public function format_negative_one_cent_usd_returns_negative_point_zero_one(): void
+    {
+        // USD has 2 subunits.
+        // Value: -1, negative=true, valueBase='1'.
+        // length: 1, subunit: 2.
+        // valueLength (1) <= subunit (2).
+        // formatted = '0.' . str_pad('', 2 - 1, '0') . '1' = '0.01'
+        // prepend '-': '-0.01'
+        $money = new Money(-1, new Currency('USD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('-0.01', $result);
+    }
+
+    #[Test]
+    public function format_negative_one_dollar_usd_returns_negative_one_zero_zero(): void
+    {
+        // USD has 2 subunits.
+        // Value: -100, negative=true, valueBase='100'.
+        // length: 3, subunit: 2.
+        // valueLength (3) > subunit (2).
+        // formatted = '1' . '.' . '00' = '1.00'
+        // prepend '-': '-1.00'
+        $money = new Money(-100, new Currency('USD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('-1.00', $result);
+    }
+
+    #[Test]
+    public function format_jpy_zero_returns_zero_without_decimals(): void
+    {
+        // JPY has 0 subunits.
+        // Value: 0, length: 1, subunit: 0.
+        // valueLength (1) > subunit (0).
+        // formatted = substr('0', 0, 1-0) = '0'
+        // decimalDigits = substr('0', 1) = ''
+        // if len > 0 is false, so no dot added.
+        // formatted = '0'
+        $money = new Money(0, new Currency('JPY'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('0', $result);
+    }
+
+    #[Test]
+    public function format_jpy_one_returns_one_without_decimals(): void
+    {
+        // JPY has 0 subunits.
+        // Value: 1, length: 1, subunit: 0.
+        // valueLength (1) > subunit (0).
+        // formatted = substr('1', 0, 1) = '1'
+        // decimalDigits = substr('1', 1) = ''
+        // formatted = '1'
+        $money = new Money(1, new Currency('JPY'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('1', $result);
+    }
+
+    #[Test]
+    public function format_jpy_hundred_returns_one_hundred_without_decimals(): void
+    {
+        // JPY has 0 subunits.
+        // Value: 100, length: 3, subunit: 0.
+        // valueLength (3) > subunit (0).
+        // formatted = substr('100', 0, 3) = '100'
+        // decimalDigits = substr('100', 3) = ''
+        // formatted = '100'
+        $money = new Money(100, new Currency('JPY'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('100', $result);
+    }
+
+    #[Test]
+    public function format_bif_zero_returns_zero_without_decimals(): void
+    {
+        // BIF has 0 subunits.
+        // Value: 0, length: 1, subunit: 0.
+        // formatted = '0'
+        $money = new Money(0, new Currency('BIF'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('0', $result);
+    }
+
+    #[Test]
+    public function format_vnf_large_value_returns_correct_string(): void
+    {
+        // VND has 0 subunits.
+        // Value: 100000, length: 6, subunit: 0.
+        // formatted = substr('100000', 0, 6) = '100000'
+        // decimalDigits = ''
+        // formatted = '100000'
+        $money = new Money(100000, new Currency('VND'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('100000', $result);
+    }
+
+    #[Test]
+    public function format_usd_with_more_than_two_digits_in_fractional_part_pads_zeros(): void
+    {
+        // This case tests when the integer part calculation leaves fewer digits than expected for decimals?
+        // Actually, let's look at a case where valueBase length equals subunit exactly but we want to ensure boundary.
+        // We already did 10 cents (10). Let's do 9 cents.
+        
+        // Value: 9, length: 1, subunit: 2.
+        // valueLength (1) <= subunit (2).
+        // formatted = '0.' . str_pad('', 2 - 1, '0') . '9'
+        //           = '0.' . '0' . '9' = '0.09'
+        $money = new Money(9, new Currency('USD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('0.09', $result);
+    }
+
+    #[Test]
+    public function format_usd_just_below_integer_boundary(): void
+    {
+        // Value: 99, length: 2, subunit: 2.
+        // valueLength (2) <= subunit (2).
+        // formatted = '0.' . str_pad('', 2 - 2, '0') . '99'
+        //           = '0.' . '' . '99' = '0.99'
+        $money = new Money(99, new Currency('USD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('0.99', $result);
+    }
+
+    #[Test]
+    public function format_usd_just_above_integer_boundary(): void
+    {
+        // Value: 100, length: 3, subunit: 2.
+        // valueLength (3) > subunit (2).
+        // formatted = '1' . '.' . '00' = '1.00'
+        $money = new Money(100, new Currency('USD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('1.00', $result);
+    }
+
+    #[Test]
+    public function format_usd_large_amount(): void
+    {
+        // Value: 123456789, length: 9, subunit: 2.
+        // valueLength (9) > subunit (2).
+        // formatted = substr('123456789', 0, 7) = '1234567'
+        // decimalDigits = substr('123456789', 7) = '89'
+        // formatted = '1234567.89'
+        $money = new Money(123456789, new Currency('USD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('1234567.89', $result);
+    }
+
+    #[Test]
+    public function format_negative_large_amount(): void
+    {
+        // Value: -123456789, negative=true, valueBase='123456789'.
+        // Same logic as above, then prepend '-'.
+        $money = new Money(-123456789, new Currency('USD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('-1234567.89', $result);
+    }
+
+    #[Test]
+    public function format_jpy_negative_large_amount(): void
+    {
+        // Value: -12345, negative=true, valueBase='12345'.
+        // subunit: 0.
+        // valueLength (5) > subunit (0).
+        // formatted = substr('12345', 0, 5) = '12345'
+        // decimalDigits = ''
+        // formatted = '12345'
+        // prepend '-': '-12345'
+        $money = new Money(-12345, new Currency('JPY'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('-12345', $result);
+    }
+
+    #[Test]
+    public function format_currency_with_three_subunits_krw_zero(): void
+    {
+        // KRW has 0 subunits actually in ISO 4217, but let's check a hypothetical or real one with 3?
+        // Most currencies have 0 or 2. Some have 3 like BHD, KWD, OMR, TND, LYD.
+        // Let's use BHD (Bahraini Dinar) which has 3 subunits.
+        
+        // Value: 0, length: 1, subunit: 3.
+        // valueLength (1) <= subunit (3).
+        // formatted = '0.' . str_pad('', 3 - 1, '0') . '0'
+        //           = '0.' . '00' . '0' = '0.000'
+        $money = new Money(0, new Currency('BHD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('0.000', $result);
+    }
+
+    #[Test]
+    public function format_bhd_one_subunit(): void
+    {
+        // BHD has 3 subunits.
+        // Value: 1, length: 1, subunit: 3.
+        // valueLength (1) <= subunit (3).
+        // formatted = '0.' . str_pad('', 3 - 1, '0') . '1'
+        //           = '0.' . '00' . '1' = '0.001'
+        $money = new Money(1, new Currency('BHD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('0.001', $result);
+    }
+
+    #[Test]
+    public function format_bhd_just_below_integer_boundary(): void
+    {
+        // BHD has 3 subunits.
+        // Value: 999, length: 3, subunit: 3.
+        // valueLength (3) <= subunit (3).
+        // formatted = '0.' . str_pad('', 3 - 3, '0') . '999'
+        //           = '0.' . '' . '999' = '0.999'
+        $money = new Money(999, new Currency('BHD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('0.999', $result);
+    }
+
+    #[Test]
+    public function format_bhd_at_integer_boundary(): void
+    {
+        // BHD has 3 subunits.
+        // Value: 1000, length: 4, subunit: 3.
+        // valueLength (4) > subunit (3).
+        // formatted = substr('1000', 0, 4-3) = '1'
+        // decimalDigits = substr('1000', 4-3) = '000'
+        // formatted = '1.000'
+        $money = new Money(1000, new Currency('BHD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('1.000', $result);
+    }
+
+    #[Test]
+    public function format_bhd_one_point_five(): void
+    {
+        // BHD has 3 subunits.
+        // Value: 1500, length: 4, subunit: 3.
+        // valueLength (4) > subunit (3).
+        // formatted = substr('1500', 0, 1) = '1'
+        // decimalDigits = substr('1500', 1) = '500'
+        // formatted = '1.500'
+        $money = new Money(1500, new Currency('BHD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('1.500', $result);
+    }
+
+    #[Test]
+    public function format_bhd_negative_one_subunit(): void
+    {
+        // BHD has 3 subunits.
+        // Value: -1, negative=true, valueBase='1'.
+        // valueLength (1) <= subunit (3).
+        // formatted = '0.001'
+        // prepend '-': '-0.001'
+        $money = new Money(-1, new Currency('BHD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('-0.001', $result);
+    }
+
+    #[Test]
+    public function format_empty_string_assertion_does_not_fail_for_valid_input(): void
+    {
+        // The code has `assert($formatted !== '')`. 
+        // With valid inputs, this should never fail.
+        // If it fails, it means there's a bug in the formatter producing an empty string.
+        // We test a simple case to ensure the assertion passes.
+        $money = new Money(0, new Currency('USD'));
+        $result = $this->formatter->format($money);
+        
+        assertSame('0.00', $result);
+    }
+}
+```

@@ -1,0 +1,9 @@
+[
+    {
+        "key": "ab84b62ead1b",
+        "verdict": "equivalent",
+        "reason": "When fractionDigits equals subunit, the difference is zero, so str_pad adds an empty string, resulting in no change to the decimal value, which matches the original code's behavior of skipping the block.",
+        "mutator": "LessThan",
+        "line": 66
+    }
+]

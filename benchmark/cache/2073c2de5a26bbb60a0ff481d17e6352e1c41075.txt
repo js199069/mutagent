@@ -1,0 +1,504 @@
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Generated;
+
+use Money\Number;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
+
+final class NumberGeneratedTest extends TestCase
+{
+    #[Test]
+    public function constructor_with_valid_integer_and_fractional_parts(): void
+    {
+        $number = new Number('123', '45');
+        self::assertSame('123', $number->getIntegerPart());
+        self::assertSame('45', $number->getFractionalPart());
+    }
+
+    #[Test]
+    public function constructor_with_valid_integer_only(): void
+    {
+        $number = new Number('123');
+        self::assertSame('123', $number->getIntegerPart());
+        self::assertSame('', $number->getFractionalPart());
+    }
+
+    #[Test]
+    public function constructor_with_zero_integer(): void
+    {
+        $number = new Number('0', '5');
+        self::assertSame('0', $number->getIntegerPart());
+        self::assertSame('5', $number->getFractionalPart());
+    }
+
+    #[Test]
+    public function constructor_with_negative_integer(): void
+    {
+        $number = new Number('-123', '45');
+        self::assertSame('-123', $number->getIntegerPart());
+        self::assertSame('45', $number->getFractionalPart());
+    }
+
+    #[Test]
+    public function constructor_throws_exception_for_empty_number(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Empty number is invalid');
+        new Number('', '');
+    }
+
+    #[Test]
+    public function constructor_throws_exception_for_leading_zeros_in_integer_part(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Leading zeros are not allowed');
+        new Number('0123', '45');
+    }
+
+    #[Test]
+    public function constructor_throws_exception_for_invalid_digit_in_integer_part(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        // The message format is: "Invalid integer part 1a. Invalid digit a found"
+        $this->expectExceptionMessageMatches('/Invalid integer part 1a\. Invalid digit a found/');
+        new Number('1a', '45');
+    }
+
+    #[Test]
+    public function constructor_throws_exception_for_invalid_digit_in_fractional_part(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        // The message format is: "Invalid fractional part .a. Invalid digit a found"
+        $this->expectExceptionMessageMatches('/Invalid fractional part \.a\. Invalid digit a found/');
+        new Number('123', '.a');
+    }
+
+    #[Test]
+    public function from_string_parses_decimal_correctly(): void
+    {
+        $number = Number::fromString('123.456');
+        self::assertSame('123', $number->getIntegerPart());
+        self::assertSame('456', $number->getFractionalPart());
+    }
+
+    #[Test]
+    public function from_string_trims_trailing_zeros_from_fractional_part(): void
+    {
+        $number = Number::fromString('123.4500');
+        self::assertSame('123', $number->getIntegerPart());
+        self::assertSame('45', $number->getFractionalPart());
+    }
+
+    #[Test]
+    public function from_string_handles_integer_only_string(): void
+    {
+        $number = Number::fromString('123');
+        self::assertSame('123', $number->getIntegerPart());
+        self::assertSame('', $number->getFractionalPart());
+    }
+
+    #[Test]
+    public function from_float_converts_float_to_number(): void
+    {
+        // Using a float that might have precision issues if not handled correctly
+        $number = Number::fromFloat(123.45);
+        self::assertSame('123', $number->getIntegerPart());
+        self::assertSame('45', $number->getFractionalPart());
+    }
+
+    #[Test]
+    public function from_float_handles_very_small_decimals(): void
+    {
+        $number = Number::fromFloat(0.00000000000001);
+        // sprintf('%.14F', 0.00000000000001) results in '0.00000000000001'
+        // rtrim(..., '0') keeps the '1'
+        self::assertSame('0', $number->getIntegerPart());
+        self::assertSame('1', $number->getFractionalPart());
+    }
+
+    #[Test]
+    public function from_number_with_int(): void
+    {
+        $number = Number::fromNumber(123);
+        self::assertSame('123', $number->getIntegerPart());
+        self::assertSame('', $number->getFractionalPart());
+    }
+
+    #[Test]
+    public function from_number_with_string(): void
+    {
+        $number = Number::fromNumber('123.45');
+        self::assertSame('123', $number->getIntegerPart());
+        self::assertSame('45', $number->getFractionalPart());
+    }
+
+    #[Test]
+    public function is_decimal_returns_true_when_fractional_part_exists(): void
+    {
+        $number = new Number('123', '45');
+        self::assertTrue($number->isDecimal());
+    }
+
+    #[Test]
+    public function is_decimal_returns_false_when_no_fractional_part(): void
+    {
+        $number = new Number('123');
+        self::assertFalse($number->isDecimal());
+    }
+
+    #[Test]
+    public function is_integer_returns_true_when_no_fractional_part(): void
+    {
+        $number = new Number('123');
+        self::assertTrue($number->isInteger());
+    }
+
+    #[Test]
+    public function is_integer_returns_false_when_fractional_part_exists(): void
+    {
+        $number = new Number('123', '45');
+        self::assertFalse($number->isInteger());
+    }
+
+    #[Test]
+    public function is_half_returns_true_when_fractional_part_is_five(): void
+    {
+        $number = new Number('123', '5');
+        self::assertTrue($number->isHalf());
+    }
+
+    #[Test]
+    public function is_half_returns_false_when_fractional_part_is_not_five(): void
+    {
+        $number = new Number('123', '4');
+        self::assertFalse($number->isHalf());
+    }
+
+    #[Test]
+    public function is_half_returns_false_when_no_fractional_part(): void
+    {
+        $number = new Number('123');
+        self::assertFalse($number->isHalf());
+    }
+
+    #[Test]
+    public function is_current_even_returns_true_when_last_digit_is_even(): void
+    {
+        $number = new Number('124');
+        self::assertTrue($number->isCurrentEven());
+    }
+
+    #[Test]
+    public function is_current_even_returns_false_when_last_digit_is_odd(): void
+    {
+        $number = new Number('123');
+        self::assertFalse($number->isCurrentEven());
+    }
+
+    #[Test]
+    public function is_current_even_handles_negative_numbers(): void
+    {
+        $number = new Number('-124');
+        self::assertTrue($number->isCurrentEven());
+    }
+
+    #[Test]
+    public function is_current_even_handles_single_digit(): void
+    {
+        $number = new Number('2');
+        self::assertTrue($number->isCurrentEven());
+    }
+
+    #[Test]
+    public function is_closer_to_next_returns_true_when_first_fractional_digit_is_five_or_more(): void
+    {
+        $number = new Number('123', '5');
+        self::assertTrue($number->isCloserToNext());
+    }
+
+    #[Test]
+    public function is_closer_to_next_returns_true_when_first_fractional_digit_is_six(): void
+    {
+        $number = new Number('123', '6');
+        self::assertTrue($number->isCloserToNext());
+    }
+
+    #[Test]
+    public function is_closer_to_next_returns_false_when_first_fractional_digit_is_four(): void
+    {
+        $number = new Number('123', '4');
+        self::assertFalse($number->isCloserToNext());
+    }
+
+    #[Test]
+    public function is_closer_to_next_returns_false_when_no_fractional_part(): void
+    {
+        $number = new Number('123');
+        self::assertFalse($number->isCloserToNext());
+    }
+
+    #[Test]
+    public function to_string_returns_integer_when_no_fractional_part(): void
+    {
+        $number = new Number('123');
+        self::assertSame('123', (string) $number);
+    }
+
+    #[Test]
+    public function to_string_returns_decimal_when_fractional_part_exists(): void
+    {
+        $number = new Number('123', '45');
+        self::assertSame('123.45', (string) $number);
+    }
+
+    #[Test]
+    public function is_negative_returns_true_for_negative_numbers(): void
+    {
+        $number = new Number('-123');
+        self::assertTrue($number->isNegative());
+    }
+
+    #[Test]
+    public function is_negative_returns_false_for_positive_numbers(): void
+    {
+        $number = new Number('123');
+        self::assertFalse($number->isNegative());
+    }
+
+    #[Test]
+    public function get_integer_rounding_multiplier_returns_minus_one_for_negative_numbers(): void
+    {
+        $number = new Number('-123');
+        self::assertSame('-1', $number->getIntegerRoundingMultiplier());
+    }
+
+    #[Test]
+    public function get_integer_rounding_multiplier_returns_one_for_positive_numbers(): void
+    {
+        $number = new Number('123');
+        self::assertSame('1', $number->getIntegerRoundingMultiplier());
+    }
+
+    #[Test]
+    public function base10_with_positive_shift_moves_decimal_point_right(): void
+    {
+        // 1.23 * 10^2 = 123
+        $number = new Number('1', '23');
+        $result = $number->base10(2);
+        self::assertSame('123', $result->getIntegerPart());
+        self::assertSame('', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function base10_with_positive_shift_handles_large_shift(): void
+    {
+        // 1.23 * 10^5 = 123000
+        $number = new Number('1', '23');
+        $result = $number->base10(5);
+        self::assertSame('123000', $result->getIntegerPart());
+        self::assertSame('', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function base10_with_positive_shift_handles_negative_number(): void
+    {
+        // -1.23 * 10^2 = -123
+        $number = new Number('-1', '23');
+        $result = $number->base10(2);
+        self::assertSame('-123', $result->getIntegerPart());
+        self::assertSame('', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function base10_with_negative_shift_moves_decimal_point_left(): void
+    {
+        // 123 / 10^2 = 1.23
+        $number = new Number('123');
+        $result = $number->base10(-2);
+        self::assertSame('1', $result->getIntegerPart());
+        self::assertSame('23', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function base10_with_negative_shift_handles_large_shift(): void
+    {
+        // 123 / 10^5 = 0.00123
+        $number = new Number('123');
+        $result = $number->base10(-5);
+        self::assertSame('0', $result->getIntegerPart());
+        self::assertSame('00123', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function base10_with_negative_shift_handles_negative_number(): void
+    {
+        // -123 / 10^2 = -1.23
+        $number = new Number('-123');
+        $result = $number->base10(-2);
+        self::assertSame('-1', $result->getIntegerPart());
+        self::assertSame('23', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function base10_with_zero_shift_returns_same_number(): void
+    {
+        $number = new Number('123', '45');
+        $result = $number->base10(0);
+        self::assertSame('123', $result->getIntegerPart());
+        self::assertSame('45', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function base10_with_zero_on_zero_returns_zero(): void
+    {
+        $number = new Number('0');
+        $result = $number->base10(0);
+        self::assertSame('0', $result->getIntegerPart());
+        self::assertSame('', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function round_money_value_does_not_round_when_target_equals_having(): void
+    {
+        $result = Number::roundMoneyValue('123.45', 2, 2);
+        self::assertSame('123.45', $result);
+    }
+
+    #[Test]
+    public function round_money_value_does_not_round_when_target_greater_than_having(): void
+    {
+        $result = Number::roundMoneyValue('123.45', 3, 2);
+        self::assertSame('123.45', $result);
+    }
+
+    #[Test]
+    public function round_money_value_rounds_up_when_digit_is_five(): void
+    {
+        // 123.45 rounded to 1 decimal place -> 123.5
+        $result = Number::roundMoneyValue('123.45', 1, 2);
+        self::assertSame('123.5', $result);
+    }
+
+    #[Test]
+    public function round_money_value_rounds_down_when_digit_is_less_than_five(): void
+    {
+        // 123.44 rounded to 1 decimal place -> 123.4
+        $result = Number::roundMoneyValue('123.44', 1, 2);
+        self::assertSame('123.4', $result);
+    }
+
+    #[Test]
+    public function round_money_value_handles_carry_over(): void
+    {
+        // 123.95 rounded to 1 decimal place -> 124.0
+        $result = Number::roundMoneyValue('123.95', 1, 2);
+        self::assertSame('124.0', $result);
+    }
+
+    #[Test]
+    public function round_money_value_handles_multiple_carry_over(): void
+    {
+        // 199.99 rounded to 0 decimal places -> 200
+        $result = Number::roundMoneyValue('199.99', 0, 2);
+        self::assertSame('200', $result);
+    }
+
+    #[Test]
+    public function round_money_value_handles_negative_numbers(): void
+    {
+        // -123.45 rounded to 1 decimal place -> -123.5
+        $result = Number::roundMoneyValue('-123.45', 1, 2);
+        self::assertSame('-123.5', $result);
+    }
+
+    #[Test]
+    public function round_money_value_handles_negative_numbers_with_carry_over(): void
+    {
+        // -123.95 rounded to 1 decimal place -> -124.0
+        $result = Number::roundMoneyValue('-123.95', 1, 2);
+        self::assertSame('-124.0', $result);
+    }
+
+    #[Test]
+    public function round_money_value_handles_boundary_below_threshold(): void
+    {
+        // 123.449 rounded to 2 decimal places -> 123.45 (digit at pos 3 is 9 >= 5)
+        // Wait, targetDigits=2, havingDigits=3. Value length = 7.
+        // position = 7 - 3 + 2 = 6. moneyValue[6] is '9'.
+        // So it rounds up.
+        $result = Number::roundMoneyValue('123.449', 2, 3);
+        self::assertSame('123.45', $result);
+    }
+
+    #[Test]
+    public function round_money_value_handles_boundary_at_threshold(): void
+    {
+        // 123.450 rounded to 2 decimal places -> 123.45 (digit at pos 3 is 0 < 5)
+        // Wait, targetDigits=2, havingDigits=3. Value length = 7.
+        // position = 7 - 3 + 2 = 6. moneyValue[6] is '0'.
+        // So it does not round.
+        $result = Number::roundMoneyValue('123.450', 2, 3);
+        self::assertSame('123.450', $result);
+    }
+
+    #[Test]
+    public function round_money_value_handles_boundary_above_threshold(): void
+    {
+        // 123.451 rounded to 2 decimal places -> 123.45 (digit at pos 3 is 1 < 5)
+        // Wait, targetDigits=2, havingDigits=3. Value length = 7.
+        // position = 7 - 3 + 2 = 6. moneyValue[6] is '1'.
+        // So it does not round.
+        $result = Number::roundMoneyValue('123.451', 2, 3);
+        self::assertSame('123.451', $result);
+    }
+
+    #[Test]
+    public function round_money_value_handles_boundary_at_five(): void
+    {
+        // 123.455 rounded to 2 decimal places -> 123.46 (digit at pos 3 is 5 >= 5)
+        $result = Number::roundMoneyValue('123.455', 2, 3);
+        self::assertSame('123.46', $result);
+    }
+
+    #[Test]
+    public function round_money_value_handles_integer_input(): void
+    {
+        // 123 rounded to 0 decimal places -> 123
+        $result = Number::roundMoneyValue('123', 0, 0);
+        self::assertSame('123', $result);
+    }
+
+    #[Test]
+    public function round_money_value_handles_integer_input_with_having_digits(): void
+    {
+        // This case is tricky. If havingDigits > 0 but value has no decimal point?
+        // Let's assume standard usage where havingDigits matches the string representation.
+        // If we pass '123' with havingDigits=1, it implies there's a fractional part?
+        // But the string doesn't have one. Let's test a valid case.
+        // 123.0 rounded to 0 decimal places -> 123
+        $result = Number::roundMoneyValue('123.0', 0, 1);
+        self::assertSame('123', $result);
+    }
+
+    #[Test]
+    public function round_money_value_handles_carry_over_into_new_digit(): void
+    {
+        // 999.99 rounded to 0 decimal places -> 1000
+        $result = Number::roundMoneyValue('999.99', 0, 2);
+        self::assertSame('1000', $result);
+    }
+
+    #[Test]
+    public function round_money_value_handles_negative_carry_over_into_new_digit(): void
+    {
+        // -999.99 rounded to 0 decimal places -> -1000
+        $result = Number::roundMoneyValue('-999.99', 0, 2);
+        self::assertSame('-1000', $result);
+    }
+}
+```

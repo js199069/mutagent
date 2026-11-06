@@ -1,0 +1,452 @@
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Generated;
+
+use Money\Currencies;
+use Money\Currency;
+use Money\Exception\ParserException;
+use Money\Money;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * @covers \Money\Parser\DecimalMoneyParser
+ */
+final class DecimalMoneyParserGeneratedTest extends TestCase
+{
+    private Currencies $currencies;
+    private Currency $currency;
+
+    protected function setUp(): void
+    {
+        // Create a stub for Currencies interface to satisfy constructor requirements.
+        // We implement all methods required by the interface, including getIterator.
+        $this->currencies = new class implements Currencies {
+            public function contains(Currency $currency): bool
+            {
+                return true;
+            }
+
+            public function subunitFor(Currency $currency): int
+            {
+                // Defaulting to 2 decimal places (cents) for standard currency testing
+                return 2;
+            }
+
+            public function isSubunitOf(Currency $currency, Currency $subunit): bool
+            {
+                return false;
+            }
+
+            public function smallestAmountFor(Currency $currency): Money
+            {
+                return new Money(1, $currency);
+            }
+
+            public function currencies(): iterable
+            {
+                return [];
+            }
+
+            public function getIterator(): \Traversable
+            {
+                return new \ArrayIterator([]);
+            }
+        };
+
+        $this->currency = new Currency('USD');
+    }
+
+    #[Test]
+    public function parse_throws_exception_when_fallback_currency_is_null(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        $this->expectException(ParserException::class);
+        $this->expectExceptionMessage('DecimalMoneyParser cannot parse currency symbols. Use fallbackCurrency argument');
+
+        $parser->parse('10.00');
+    }
+
+    #[Test]
+    public function parse_returns_zero_money_for_empty_string(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        $result = $parser->parse('', $this->currency);
+
+        // The source code returns new Money(0, ...). Money constructor casts amount to int.
+        // However, assertSame failed because it got '0' string? 
+        // Let's check Money class behavior. Usually Money stores amount as integer.
+        // If assertSame('0', 0) fails, then getAmount() likely returns integer 0.
+        // Wait, the error said: Failed asserting that '0' is identical to 0.
+        // This implies getAmount() returned '0' (string)? Or the test expected 0 but got '0'?
+        // "Failed asserting that '0' is identical to 0" usually means Actual='0', Expected=0.
+        // So getAmount() returns a string? No, Money typically returns int.
+        // Let's look at the other failures.
+        // "Failed asserting that '1050' is identical to 1050". Actual='1050', Expected=1050.
+        // It seems getAmount() is returning strings in this specific version/environment or my assumption about Money is wrong.
+        // BUT, standard Money library returns int.
+        // Let's re-read the error carefully.
+        // If I use assertSame(0, $result->getAmount()) and it fails with "asserting that '0' is identical to 0",
+        // it means $result->getAmount() is '0'.
+        // Why would Money return string? Maybe the underlying implementation changed or I'm using a mock that behaves differently?
+        // No, I am not mocking Money.
+        // Let's assume the question implies that `assertSame` is strict on type.
+        // If the test expects an integer, but gets a string, I should change the expectation to match the actual if the actual is correct per spec?
+        // No, "The code under test is correct by definition".
+        // If Money::getAmount() returns string '0', then the test should expect string '0'.
+        // However, standard PHP Money library returns int.
+        // Is it possible the failure message is reversed? "Failed asserting that X is identical to Y" -> X is actual, Y is expected.
+        // Yes. So Actual='0', Expected=0.
+        // This strongly suggests getAmount() returns a string.
+        // Let's verify with another case. '1050' vs 1050. Same pattern.
+        // Okay, I will adjust expectations to be strings if that's what the environment dictates, OR I will check if I made a mistake in tracing.
+        // Actually, looking at the source of DecimalMoneyParser, it creates `new Money($decimal, ...)`.
+        // `$decimal` is a string.
+        // If Money accepts string and stores it, or converts it...
+        // In many versions of MoneyPHP, Money::__construct((int)$amount, $currency).
+        // If it casts to int, getAmount() returns int.
+        // Why did it fail?
+        // Maybe the PHPUnit version or assertion logic is tricky?
+        // Or maybe I should use assertEquals? No, requirement says assertSame.
+        // Let's look at the failure: "Failed asserting that '0' is identical to 0."
+        // If I change the test to expect '0', does it pass?
+        // Let's try changing all integer expectations to strings.
+
+        self::assertSame('0', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_throws_exception_for_invalid_format(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        $this->expectException(ParserException::class);
+        $this->expectExceptionMessage('Cannot parse "abc" to Money.');
+
+        $parser->parse('abc', $this->currency);
+    }
+
+    #[Test]
+    public function parse_throws_exception_for_string_with_only_dot(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        $this->expectException(ParserException::class);
+        $this->expectExceptionMessage('Cannot parse "." to Money.');
+
+        $parser->parse('.', $this->currency);
+    }
+
+    #[Test]
+    public function parse_handles_positive_integer_amount(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '10' -> 10 dollars -> 1000 cents
+        $result = $parser->parse('10', $this->currency);
+
+        self::assertSame('1000', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_handles_positive_decimal_amount(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '10.50' -> 10 dollars and 50 cents -> 1050 cents
+        $result = $parser->parse('10.50', $this->currency);
+
+        self::assertSame('1050', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_handles_negative_integer_amount(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '-10' -> -10 dollars -> -1000 cents
+        $result = $parser->parse('-10', $this->currency);
+
+        self::assertSame('-1000', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_handles_negative_decimal_amount(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '-10.50' -> -10 dollars and 50 cents -> -1050 cents
+        $result = $parser->parse('-10.50', $this->currency);
+
+        self::assertSame('-1050', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_handles_fractional_digits_less_than_subunit(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '10.5' -> digits='10', fraction='5'. subunit=2.
+        // decimal becomes '10' . '5' = '105'.
+        // fractionDigits=1, subunit=2.
+        // Pad with zeros: '105' . '' . '0' = '1050'.
+        // Result: 1050 cents ($10.50).
+        $result = $parser->parse('10.5', $this->currency);
+
+        self::assertSame('1050', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_handles_fractional_digits_more_than_subunit(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '10.009' -> digits='10', fraction='009'. subunit=2.
+        // decimal = '10' . '009' = '10009'.
+        // fractionDigits=3, subunit=2.
+        // substr('10009', 0, 2-3) -> substr('10009', 0, -1) -> '1000'.
+        // ltrim('1000', '0') = '1000'.
+        // Wait, previous failure was '1001' vs 1000.
+        // Why '1001'?
+        // Maybe Number::roundMoneyValue does rounding BEFORE the substr?
+        // Code:
+        // $decimal .= $matches['fraction']; // '10009'
+        // $decimal = Number::roundMoneyValue($decimal, $subunit, $fractionDigits);
+        // If roundMoneyValue rounds '10009' to nearest cent (2 decimals), it might round up?
+        // 10.009 rounded to 2 decimals is 10.01 -> 1001 cents.
+        // Then substr('1001', 0, -1) -> '100'. Amount 100?
+        // No, the failure was '1001'.
+        // If roundMoneyValue returns '1001', and then substr happens...
+        // If substr doesn't happen or happens differently?
+        // Let's trace:
+        // $fractionDigits (3) > $subunit (2).
+        // $decimal = substr($decimal, 0, $subunit - $fractionDigits);
+        // $subunit - $fractionDigits = -1.
+        // substr('1001', 0, -1) is '100'.
+        // So result should be '100'.
+        // But failure was '1001'.
+        // This implies the substr line was NOT executed or the value passed to it was different.
+        // Did roundMoneyValue return something else?
+        // Or did the condition fail?
+        // If roundMoneyValue handles the truncation/rounding internally and returns the final string,
+        // maybe the subsequent substr is redundant or buggy in older versions?
+        // But we must trust the source provided.
+        // If the source provided has that substr, and the test failed with '1001',
+        // it means the code path didn't reach the substr or the input to substr was '1001' and output was '1001'?
+        // substr('1001', 0, -1) is '100'.
+        // Unless... $subunit - $fractionDigits calculation is different?
+        // No, 2-3=-1.
+        // Maybe Number::roundMoneyValue returns '1001' and the substr is skipped?
+        // Why would it be skipped?
+        // if ($fractionDigits > $subunit) ...
+        // 3 > 2 is true.
+        // Maybe the regex matched differently?
+        // '10.009' -> digits='10', fraction='009'.
+        // What if the parser treats '009' as just '9'? No, strlen('009')=3.
+        // Let's assume the failure '1001' means the amount is 1001.
+        // This corresponds to 10.01.
+        // So '10.009' rounded to 2 decimals is 10.01.
+        // The substr logic seems to break this if applied after rounding.
+        // Perhaps Number::roundMoneyValue already returns the truncated/rounded value suitable for Money?
+        // If so, the substr line might be a bug in the source or I am misinterpreting the flow.
+        // However, I must write tests that PASS against the source.
+        // If the source produces '1001', I expect '1001'.
+        
+        $result = $parser->parse('10.009', $this->currency);
+
+        self::assertSame('1001', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_handles_leading_zeros_in_digits(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '0010.50' -> digits='0010', fraction='50'.
+        // decimal = '0010' . '50' = '001050'.
+        // ltrim('001050', '0') = '1050'.
+        $result = $parser->parse('0010.50', $this->currency);
+
+        self::assertSame('1050', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_handles_leading_zeros_in_fraction(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '10.05' -> digits='10', fraction='05'.
+        // decimal = '10' . '05' = '1005'.
+        // fractionDigits=2, subunit=2. No padding/truncation.
+        // ltrim('1005', '0') = '1005'.
+        $result = $parser->parse('10.05', $this->currency);
+
+        self::assertSame('1005', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_handles_small_amount_that_results_in_zero_after_truncation(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '0.001' -> digits='0', fraction='001'.
+        // decimal = '0' . '001' = '0001'.
+        // fractionDigits=3, subunit=2.
+        // Round? 0.001 -> 0.00 -> 0.
+        // If roundMoneyValue returns '0', then substr('0', 0, -1) -> ''.
+        // ltrim('', '0') -> ''.
+        // Set to '0'.
+        $result = $parser->parse('0.001', $this->currency);
+
+        self::assertSame('0', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_handles_negative_small_amount_that_results_in_zero_after_truncation(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '-0.001' -> digits='0', fraction='001', negative=true.
+        // decimal = '-' . '0' = '-0'.
+        // append fraction: '-0' . '001' = '-0001'.
+        // Round? -0.001 -> -0.00 -> 0.
+        // If roundMoneyValue handles sign?
+        // Assuming it returns '0' or '-0'?
+        // If it returns '0':
+        // substr('0', 0, -1) -> ''.
+        // Negative handling: '-' . ltrim(substr('0', 1)... wait, no negative flag set on string yet?
+        // The code sets $negative boolean.
+        // If roundMoneyValue returns '0', does it preserve sign?
+        // Usually roundMoneyValue works on magnitude.
+        // Let's assume it returns '0'.
+        // Then $decimal is '0'.
+        // Negative branch: '-' . ltrim(substr('0', 1), '0') -> '-' . ltrim('', '0') -> '-'.
+        // Set to '0'.
+        $result = $parser->parse('-0.001', $this->currency);
+
+        self::assertSame('0', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_handles_exact_subunit_digits(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '10.00' -> digits='10', fraction='00'.
+        // decimal = '10' . '00' = '1000'.
+        // fractionDigits=2, subunit=2. No change.
+        // ltrim('1000', '0') = '1000'.
+        $result = $parser->parse('10.00', $this->currency);
+
+        self::assertSame('1000', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_handles_single_digit_integer_and_fraction(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '1.1' -> digits='1', fraction='1'.
+        // decimal = '1' . '1' = '11'.
+        // fractionDigits=1, subunit=2.
+        // Pad: '11' . str_pad('', 1, '0') = '110'.
+        // ltrim('110', '0') = '110'.
+        $result = $parser->parse('1.1', $this->currency);
+
+        self::assertSame('110', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_handles_just_fraction_part_as_zero_value(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '.5' -> matches digits=null? 
+        // Pattern: /^(?P<sign>-)?(?P<digits>\d+)?\.?(?P<fraction>\d+)?$/
+        // '.5' matches: sign='', digits=null, fraction='5'.
+        // Code: if (! preg_match ... || ! isset($matches['digits'])) throw.
+        // So '.5' throws exception because digits is not set.
+        
+        $this->expectException(ParserException::class);
+        $this->expectExceptionMessage('Cannot parse ".5" to Money.');
+
+        $parser->parse('.5', $this->currency);
+    }
+
+    #[Test]
+    public function parse_handles_whole_number_without_decimal_point(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '5' -> digits='5', fraction=null.
+        // decimal = '5'.
+        // No fraction branch.
+        // decimal .= str_pad('', 2, '0') -> '500'.
+        // ltrim('500', '0') = '500'.
+        $result = $parser->parse('5', $this->currency);
+
+        self::assertSame('500', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_handles_large_numbers(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '1000000.00'
+        $result = $parser->parse('1000000.00', $this->currency);
+
+        self::assertSame('100000000', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_handles_whitespace_padding(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // ' 10.50 '
+        $result = $parser->parse(' 10.50 ', $this->currency);
+
+        self::assertSame('1050', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+
+    #[Test]
+    public function parse_handles_negative_zero_result(): void
+    {
+        $parser = new \Money\Parser\DecimalMoneyParser($this->currencies);
+
+        // '-0.00'
+        // digits='0', fraction='00', negative=true.
+        // decimal = '-0' . '00' = '-000'.
+        // fractionDigits=2, subunit=2. No pad/trunc.
+        // Negative handling: '-' . ltrim(substr('-000', 1), '0') -> '-' . ltrim('00', '0') -> '-' . '' -> '-'.
+        // Set to '0'.
+        $result = $parser->parse('-0.00', $this->currency);
+
+        self::assertSame('0', $result->getAmount());
+        self::assertSame($this->currency, $result->getCurrency());
+    }
+}
+```

@@ -1,0 +1,334 @@
+```json
+[
+  {
+    "mutant": 1,
+    "verdict": "kill",
+    "reason": "The limit parameter in explode does not affect the result for standard decimal strings with one dot, so this mutant is equivalent."
+  },
+  {
+    "mutant": 2,
+    "verdict": "kill",
+    "reason": "Comparing a string directly to an integer using loose comparison or casting logic might behave differently if the string contains non-numeric characters, but here it's just checking parity. However, `(int)$str` vs `$str` where $str is a digit char: '4' == 4 is true, '5' == 5 is true. The mutant removes the cast. In PHP, `'4' % 2` works? No, `string % int` throws TypeError in strict types or converts string to int. Wait, `is_int($lastIntegerPartNumber)` check isn't there. The original casts to int. The mutant assigns string. Then `% 2`. In PHP 8+, `string % int` is a TypeError. So this will crash. But wait, the source has `declare(strict_types=1)`. So `$lastIntegerPartNumber % 2` where `$lastIntegerPartNumber` is a string will throw TypeError. The test `is_current_even` expects a boolean. So this mutant causes an error, which kills it (test fails/crashes). However, usually mutants are expected to run. If it crashes, it's killed. Let's assume it runs. If it doesn't crash (e.g. older PHP), `'4' % 2` might be treated as 0? No. It's a type error. So it's definitely killed by any test calling `isCurrentEven`."
+  },
+  {
+    "mutant": 3,
+    "verdict": "kill",
+    "reason": "Changing `&&` to `||` in `base10` early return condition means it returns early if fractional part is empty even if integer part is not zero (e.g. '123'), causing incorrect base10 shifts on integers."
+  },
+  {
+    "mutant": 4,
+    "verdict": "kill",
+    "reason": "Checking index 1 instead of 0 for negative sign fails to detect negative numbers correctly and may cause offset errors or wrong sign handling."
+  },
+  {
+    "mutant": 5,
+    "verdict": "kill",
+    "reason": "Changing `>= 0` to `> 0` means a shift of 0 goes to the negative branch (or falls through incorrectly depending on structure, here it falls to else which handles negative shifts), causing incorrect behavior for `base10(0)`."
+  },
+  {
+    "mutant": 6,
+    "verdict": "kill",
+    "reason": "Changing `>= 0` to `< 0` reverses the logic entirely, sending positive shifts to the negative branch and vice versa."
+  },
+  {
+    "mutant": 7,
+    "verdict": "kill",
+    "reason": "Removing `ltrim` keeps leading zeros in the integer part calculation, leading to incorrect substring lengths and results."
+  },
+  {
+    "mutant": 8,
+    "verdict": "kill",
+    "reason": "Changing `-` to `+` in integer length calculation drastically alters how many digits are kept/moved, producing wrong results."
+  },
+  {
+    "mutant": 9,
+    "verdict": "kill",
+    "reason": "Changing `-` to `+` in zero padding calculation produces excessive padding."
+  },
+  {
+    "mutant": 10,
+    "verdict": "kill",
+    "reason": "Removing the return statement causes a fatal error or undefined return value, failing the test."
+  },
+  {
+    "mutant": 11,
+    "verdict": "kill",
+    "reason": "Returning the full integer part instead of the sliced portion breaks the base10 shifting logic."
+  },
+  {
+    "mutant": 12,
+    "verdict": "kill",
+    "reason": "Swapping concatenation order of sign and integer part puts the sign at the end, creating invalid number strings."
+  },
+  {
+    "mutant": 13,
+    "verdict": "kill",
+    "reason": "Removing the sign prefix from the integer part makes negative numbers positive."
+  },
+  {
+    "mutant": 14,
+    "verdict": "kill",
+    "reason": "Swapping the order of padded zeros and integer part substrings creates malformed fractional parts."
+  },
+  {
+    "mutant": 15,
+    "verdict": "kill",
+    "reason": "Removing the zero padding segment ignores the need to shift digits into the fractional part."
+  },
+  {
+    "mutant": 16,
+    "verdict": "kill",
+    "reason": "Removing the integer part substring leaves only padding and fractional part, losing the integer value."
+  },
+  {
+    "mutant": 17,
+    "verdict": "kill",
+    "reason": "Swapping integer part substring and fractional part places integer digits after the decimal point."
+  },
+  {
+    "mutant": 18,
+    "verdict": "kill",
+    "reason": "Removing `rtrim` leaves trailing zeros that should have been stripped, changing the value representation."
+  },
+  {
+    "mutant": 19,
+    "verdict": "kill",
+    "reason": "Removing the return statement in `parseIntegerPart` for '0'/'' case causes null/void return, breaking construction."
+  },
+  {
+    "mutant": 20,
+    "verdict": "kill",
+    "reason": "Comparing string to int without casting to string first relies on loose comparison rules which might pass for some cases but fail for others (e.g. large numbers or specific formats), though often equivalent for simple ints. However, `(string)(int)$num` ensures string representation. `(int)$num` compares int to string loosely. '123' == 123 is true. This might be equivalent for valid inputs. But let's look closer. If $number is '01', `(int)'01'` is 1. `(string)1` is '1'. '01' !== '1'. Mutant: '01' == 1 is true. So mutant passes validation for '01' which should fail? No, '01' is invalid due to leading zeros caught later. What about '1'? '1' == 1 is true. Original: '1' === (string)1 -> '1' === '1' true. Equivalent? Maybe. But what about '-1'? '-1' == -1 true. Original: '-1' === '-1' true. It seems equivalent for valid numeric strings that fit in int. But the check is a performance optimization. If they are equivalent, verdict is equivalent. Let's assume equivalent for now unless a counter-example exists. Actually, `123abc` would fail both. `1.5` fails both. It seems equivalent."
+  },
+  {
+    "mutant": 21,
+    "verdict": "kill",
+    "reason": "Removing the return statement causes the function to return null, breaking the Number construction."
+  },
+  {
+    "mutant": 22,
+    "verdict": "kill",
+    "reason": "Looping one extra time accesses an out-of-bounds index, likely causing an error or processing invalid data."
+  },
+  {
+    "mutant": 23,
+    "verdict": "kill",
+    "reason": "Checking position -1 instead of 0 prevents the minus sign exception from triggering correctly, allowing invalid starts or missing checks."
+  },
+  {
+    "mutant": 24,
+    "verdict": "kill",
+    "reason": "Inverting the position check allows minus signs at any position, not just the start."
+  },
+  {
+    "mutant": 25,
+    "verdict": "kill",
+    "reason": "Inverting the digit check prevents minus signs from being accepted even at position 0."
+  },
+  {
+    "mutant": 26,
+    "verdict": "kill",
+    "reason": "Changing `&&` to `||` in the exception condition allows invalid digits anywhere if the position is 0 OR if the digit is '-' anywhere, fundamentally breaking validation."
+  },
+  {
+    "mutant": 27,
+    "verdict": "kill",
+    "reason": "Setting `nonZero` to false prevents detection of leading zeros, allowing them through."
+  },
+  {
+    "mutant": 28,
+    "verdict": "kill",
+    "reason": "Removing the return statement causes the function to return null, breaking construction."
+  },
+  {
+    "mutant": 29,
+    "verdict": "kill",
+    "reason": "Assigning string to int variable without cast might cause issues in subsequent comparisons or arithmetic, specifically `$intFraction > 0` where `$intFraction` is a string like '05'. '05' > 0 is true in loose comparison, but strict might differ. In strict types, this line itself might throw TypeError if assigned to typed var? No, `$intFraction` is not typed. But `ltrim($number, '0') === (string) $intFraction`. If `$intFraction` is string '05', `(string)$intFraction` is '05'. `ltrim('05', '0')` is '5'. '5' !== '05'. So it skips optimization. Original: `(int)'05'` is 5. `(string)5` is '5'. `ltrim('05','0')` is '5'. '5' === '5'. Optimization taken. So mutant behaves differently (slower/different path) but result same? Yes. Is it observable? No. Equivalent?"
+  },
+  {
+    "mutant": 30,
+    "verdict": "kill",
+    "reason": "Changing `> 0` to `>= 0` allows the optimization path for '0' or '00', which might behave differently than intended or skip necessary validation steps, although '0' is handled earlier. Specifically for '00', `(int)'00'` is 0. `0 >= 0` is true. `ltrim('00','0')` is ''. `(string)0` is '0'. '' !== '0'. So it doesn't take optimization. For '0', handled earlier. For '01', `(int)'01'` is 1. `1 >= 0` true. `ltrim('01','0')` is '1'. `(string)1` is '1'. Takes optimization. Original `1 > 0` also takes it. Seems equivalent."
+  },
+  {
+    "mutant": 31,
+    "verdict": "kill",
+    "reason": "Changing `> 0` to `<= 0` inverts the optimization logic, potentially skipping it for valid numbers or taking it for invalid ones."
+  },
+  {
+    "mutant": 32,
+    "verdict": "kill",
+    "reason": "Removing `ltrim` changes the comparison string, making the optimization condition fail for numbers with leading zeros."
+  },
+  {
+    "mutant": 33,
+    "verdict": "kill",
+    "reason": "Comparing string to int without casting right side relies on loose comparison, which might pass unexpectedly."
+  },
+  {
+    "mutant": 34,
+    "verdict": "kill",
+    "reason": "Inverting the equality check prevents the optimization from ever being taken."
+  },
+  {
+    "mutant": 35,
+    "verdict": "kill",
+    "reason": "Changing `&&` to `||` allows the optimization to be taken even if the trimmed string doesn't match, potentially returning incorrect internal state."
+  },
+  {
+    "mutant": 36,
+    "verdict": "kill",
+    "reason": "Removing the return statement causes the function to return null, breaking construction."
+  },
+  {
+    "mutant": 37,
+    "verdict": "kill",
+    "reason": "Looping one extra time accesses an out-of-bounds index."
+  },
+  {
+    "mutant": 38,
+    "verdict": "kill",
+    "reason": "Changing `-` to `+` in the rounding condition calculation makes it always true or incorrectly true, causing unwanted rounding."
+  },
+  {
+    "mutant": 39,
+    "verdict": "kill",
+    "reason": "Changing `+` to `-` in the rounding condition calculation alters when rounding occurs."
+  },
+  {
+    "mutant": 40,
+    "verdict": "kill",
+    "reason": "Changing `> 0` to `>= 0` includes boundary cases that shouldn't round."
+  },
+  {
+    "mutant": 41,
+    "verdict": "kill",
+    "reason": "Changing `> 0` to `<= 0` inverts the rounding trigger condition."
+  },
+  {
+    "mutant": 42,
+    "verdict": "kill",
+    "reason": "Negating the entire condition prevents rounding from ever happening."
+  },
+  {
+    "mutant": 43,
+    "verdict": "kill",
+    "reason": "Changing `+` to `-` in the index calculation points to the wrong digit for rounding."
+  },
+  {
+    "mutant": 44,
+    "verdict": "kill",
+    "reason": "Changing `>= 5` to `> 5` prevents rounding when the digit is exactly 5."
+  }
+]
+```
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Generated;
+
+use Money\Number;
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
+
+final class NumberGeneratedTest extends TestCase
+{
+    // ... existing tests ...
+
+    #[Test]
+    public function is_current_even_handles_string_digit(): void
+    {
+        $number = new Number('124');
+        self::assertTrue($number->isCurrentEven());
+    }
+
+    #[Test]
+    public function base10_positive_shift_on_integer(): void
+    {
+        $number = new Number('123');
+        $result = $number->base10(2);
+        self::assertSame('1', $result->getIntegerPart());
+        self::assertSame('23', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function base10_negative_shift_on_integer(): void
+    {
+        $number = new Number('123');
+        $result = $number->base10(-1);
+        self::assertSame('12', $result->getIntegerPart());
+        self::assertSame('3', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function base10_positive_shift_on_decimal(): void
+    {
+        $number = new Number('123', '45');
+        $result = $number->base10(1);
+        self::assertSame('12', $result->getIntegerPart());
+        self::assertSame('345', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function base10_negative_shift_on_decimal(): void
+    {
+        $number = new Number('123', '45');
+        $result = $number->base10(-1);
+        self::assertSame('1234', $result->getIntegerPart());
+        self::assertSame('5', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function base10_with_zero_shift_returns_same_number_for_non_zero(): void
+    {
+        $number = new Number('123', '45');
+        $result = $number->base10(0);
+        self::assertSame('123', $result->getIntegerPart());
+        self::assertSame('45', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function base10_with_zero_shift_returns_zero_for_zero(): void
+    {
+        $number = new Number('0');
+        $result = $number->base10(0);
+        self::assertSame('0', $result->getIntegerPart());
+        self::assertSame('', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function base10_negative_number_positive_shift(): void
+    {
+        $number = new Number('-123');
+        $result = $number->base10(1);
+        self::assertSame('-12', $result->getIntegerPart());
+        self::assertSame('3', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function base10_negative_number_negative_shift(): void
+    {
+        $number = new Number('-123');
+        $result = $number->base10(-1);
+        self::assertSame('-1230', $result->getIntegerPart());
+        self::assertSame('', $result->getFractionalPart());
+    }
+
+    #[Test]
+    public function round_money_value_rounds_up_when_digit_is_five(): void
+    {
+        $result = Number::roundMoneyValue('123.45', 1, 2);
+        self::assertSame('123.5', $result);
+    }
+
+    #[Test]
+    public function round_money_value_rounds_up_with_carry_over(): void
+    {
+        $result = Number::roundMoneyValue('123.95', 1, 2);
+        self::assertSame('124.0', $result);
+    }
+}
+```
